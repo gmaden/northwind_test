@@ -1,0 +1,123 @@
+>>>markdown
+### SCOPE
+
+In this project i would like to answer all the questions from Curbal's '25 Days of DAX Fridays! Challenge – Ed1: NorthWind Company' (https://curbal.com/25-days-of-dax-fridays-challenge-ed1-northwind-company) using Malloy. Now in this challenge all the required answers are in form of single numeric value or string - i won't be returning tables here and i won't be able to show some of Malloy's key concepts (like reusing queries, nesting and many more). So this notebook is begginer's level.
+>>>markdown
+
+
+I've decided to use csv files from this source:
+https://github.com/graphql-compose/graphql-compose-examples/tree/master/examples/northwind/data/csv .
+When using csv or parquet files DuckDb is used as underlying engine (currently Malloy can be used also with BigQuery or Postgres). Csv files were transformed to parquet files (this can be visible in **DataTransformation.malloysql** notebook).
+
+Dataset consists of 11 tables (2 tables are missing from original schema: customer_customer_demo and customer_demographics).
+
+This is how original schema looks like: (from https://github.com/yugabyte/yugabyte-db/wiki/Northwind-Sample-Database)
+
+![Alt text](schema.png)
+
+
+### THE MODEL
+
+To start using Malloy, first i need to create model. This includes defining data sources, specifying joins, creating dimensions and measures. Malloy is designed in a way to work swiftly with transactional data and (from what i understand) there is no need to create dimensional model. This is a different approach than the one in Power Bi ecosystem, where the best practice is to create star schema, a design that guarantees good performance and simplified DAX code.
+
+I can work on the model in two ways:
+Option 1: As i have database schema i can specify all the joins from start. To specify a  join inside source, the joined source needs to exist already, so I would have to start from outermost tables in the schema and move to the center.
+
+Option 2: First i would define base sources from tables together with measures and dimensions (we can think about dimensions as calculated columns in PBI world). This join-less model would allow me to calculate most of the interesting numbers from those tables. For cross-table metrics, i would create new sources by extending those base sources with joins.
+
+(There is also third option: define join on the fly (so it would work only for specific query) using 'run: source_name extend {}'.)
+
+I will stick with option 1:
+>>>malloy
+>>>markdown
+Model is more or less ready. In some of the sources we can spot dimensions and measures - most of these were added later, while answering questions.
+>>>markdown
+### QUESTIONS
+
+
+Question 1: How many current products cost less then 20$?
+>>>malloy
+>>>markdown
+
+Question 2: Which product is the most expensive? Success at third try. Currently correlated subqueries are not available in Malloy so i added a column with ALL (like calculated column in PBI) and then filtered by the value in this column:
+>>>malloy
+>>>markdown
+
+Question 3: What is the average unit price for our products?
+>>>malloy
+>>>markdown
+Question 4: How many products are above the average unit price? 
+>>>malloy
+    
+>>>markdown
+
+Question 5: How many products cost between $15 and $25? (inclusive)
+>>>malloy
+>>>markdown
+
+Question 6: What is the average number of products (not qty) per order? - this question was later clarified: we need to calculate average order size:
+>>>markdown
+
+Also calculated using pipeline:
+>>>malloy
+>>>markdown
+
+Question 7: What is the order value in $ of open orders? (not shipped)
+`order_is_open` is something we might want to ask often so it was added to the OrdersBase source.
+>>>malloy
+>>>markdown
+Question 8: How many orders are single item (only one product ordered)?
+>>>malloy
+>>>markdown
+Question 9: Avg sales per transaction for "Romero y Tobillo"
+>>>malloy
+>>>markdown
+Question 10: How many days since 'North/South' last purchase?
+>>>markdown
+Question 11: How many customers have ordered only once?
+>>>malloy
+>>>markdown
+Question 12: How many new customers in 1998? - (slightly modified, 1998 instead of 2022 as my version of data has different time range)
+>>>malloy
+>>>markdown
+Question 13: How many lost customers in 1998 (no purchases)? - so how many customers bought something in 1997 but nothing in 1998
+(slightly modified, 1998 instead of 2022 as my version of data has different time range, picked 1998)
+>>>malloy
+>>>markdown
+Question 14: How many customers has never purchased Queso Cabrales?
+>>>malloy
+ 
+>>>markdown
+Question 15: How many customers have purchased only Queso Cabrales?
+>>>malloy
+>>>markdown
+Question 16: How many products are out of stock?
+>>>malloy
+>>>markdown
+Question 17: How many products need to be restocked (based on restock levels)?
+>>>malloy
+>>>markdown
+Question 18: How many products on order we need to restock?
+>>>malloy
+>>>markdown
+Question 19: What is the stocked value of the discontinued products?
+>>>malloy
+>>>markdown
+Question 20: Which vendor has the highest stock value?
+>>>malloy
+>>>markdown
+Question 21: How many employees (%) are female? (we don't seem to have a gender, see if you can solve with baby names.)
+>>>malloy
+>>>markdown
+Question 22: How many employees are 60 years old or over?
+
+Cannot solve this one as i am missing 'age' column in my source.
+>>>markdown
+Question 23: Which employee had the highest sales in 1997? - (slightly modified, originally it was 2022 but my version of data has different time range)
+>>>malloy
+>>>markdown
+Question 24: How many employees sold over 100K$ in 1997? (slightly modified, originally it was 2022 but my version of data has different time range)
+>>>malloy
+>>>markdown
+Question 25: How many employees got hired in 1994?
+>>>malloy

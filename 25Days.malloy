@@ -1,0 +1,107 @@
+source: CategoriesBase is duckdb.table('../northwind_test/parquet/categories.parquet') extend {
+  primary_key: categoryID
+}
+
+source: SuppliersBase is duckdb.table('../northwind_test/parquet/suppliers.parquet') extend {
+  primary_key: supplierID
+}
+
+source: ProductsBase is duckdb.table('../northwind_test/parquet/products.parquet') extend {
+  primary_key: supplierID
+  measure: 
+    product_count is count()
+    total_price is unitPrice.sum()
+    # format="#.##"
+    avg_price is unitPrice.avg()
+}
+
+source: OrderDetailsBase is duckdb.table('../northwind_test/parquet/order_details.parquet') extend {
+  dimension:
+    revenue is unitPrice * quantity
+  measure:
+    total_quantity is quantity.sum()
+    total_discount is discount.sum()
+    total_revenue is revenue.sum()
+    item_count is count()
+}
+
+
+-- ok so i have one 'branch' of the model. Now i need to do the same with second Orders branch. Starting with edge tables:
+
+
+source: RegionsBase is duckdb.table('../northwind_test/parquet/regions.parquet') extend {
+    primary_key: regionID
+}
+
+--now i will join Regions to Territories
+
+source: TerritoriesBase is duckdb.table('../northwind_test/parquet/territories.parquet') extend {
+  primary_key: territoryID
+}
+
+source: EmployeeTerritoriesBase is duckdb.table('../northwind_test/parquet/employee_territories.parquet') {}
+
+
+source: EmployeeTerritories is duckdb.table('../northwind_test/parquet/employee_territories.parquet') extend {
+  join_one: Territories is TerritoriesBase with territoryID
+}
+
+source: EmployeesBase is duckdb.table('../northwind_test/parquet/employees.parquet') extend {
+  primary_key: employeeID
+}
+
+source: CustomersBase is duckdb.table('../northwind_test/parquet/customers.parquet') extend {
+  primary_key: customerID
+}
+
+source: ShippersBase is duckdb.table('../northwind_test/parquet/shippers.parquet') extend {
+  primary_key: shipperID
+}
+
+source: OrdersBase is duckdb.table('../northwind_test/parquet/orders.parquet') extend {
+  primary_key: orderID
+  dimension: 
+    order_date is orderDate::date
+    order_year is year(orderDate)
+    order_is_open is shippedDate = null
+  measure: 
+    order_count is count()
+}
+
+-- now i will join Customers, Shippers and two 'branches': Employees and OrderDetails, to Orders: 
+source: Orders is OrdersBase extend {
+  join_one: Customers is CustomersBase with customerID
+  join_one: Shippers is ShippersBase on Shippers.shipperID = shipVia
+  join_one: Employees is EmployeesBase extend {
+    join_many: EmployeeTerritories is EmployeeTerritoriesBase extend {
+      join_one: Territories is TerritoriesBase extend {
+        join_one: Regions is RegionsBase with regionID
+      } with territoryID
+    } on EmployeeTerritories.employeeID = employeeID
+  }
+  join_many: OrderDetails is OrderDetailsBase extend {
+    join_one: Products  is ProductsBase extend {
+      join_one: Categories is CategoriesBase with categoryID
+      join_one: Suppliers is SuppliersBase with supplierID  
+    } with productID
+  } on orderID = OrderDetails.orderID            
+}
+
+source: Customers is CustomersBase extend {
+  join_many: Orders is OrdersBase extend {
+    join_one: Shippers is ShippersBase on Shippers.shipperID = shipVia
+    join_one: Employees is EmployeesBase extend {
+      join_many: EmployeeTerritories is EmployeeTerritoriesBase extend {
+        join_one: Territories is TerritoriesBase extend {
+          join_one: Regions is RegionsBase with regionID
+        } with territoryID
+      } on EmployeeTerritories.employeeID = employeeID
+    }
+    join_many: OrderDetails is OrderDetailsBase extend {
+      join_one: Products  is ProductsBase extend {
+        join_one: Categories is CategoriesBase with categoryID
+        join_one: Suppliers is SuppliersBase with supplierID  
+      } with productID
+    } on orderID = OrderDetails.orderID 
+  } on Orders.customerID=customerID    
+}
