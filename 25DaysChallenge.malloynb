@@ -29,7 +29,7 @@ run: ProductsBase -> {
 }
 >>>markdown
 
-Question 2: Which product is the most expensive? Success at third try. Currently correlated subqueries are not available in Malloy so i added a column with ALL (like calculated column in PBI) and then filtered by the value in this column:
+Question 2: Which product is the most expensive?
 >>>malloy
 run: ProductsBase -> {
     project: productName, unitPrice, is_current
@@ -51,8 +51,8 @@ run: ProductsBase -> {
 }
 
 run: ProductsBase -> {
-    aggregate:
-        avg_unit_price is round(unitPrice.avg(), 2)
+    # format currency
+    aggregate: avg_unit_price is unitPrice.avg()
 }
 >>>markdown
 Question 4: How many products are above the average unit price? 
@@ -139,6 +139,7 @@ INNER JOIN '../northwind_test/parquet/orders.parquet' AS orders ON details.order
 // Version 2, 
 run: OrdersBase -> {
     join_many: details is OrderDetailsBase on orderID = details.orderID
+    # format currency
     aggregate: open_orders_value is details.revenue.sum()
     where: order_is_open
 }
@@ -166,6 +167,7 @@ run: OrderDetailsBase -> {
       join_one: customer_detail is CustomersBase on customer_detail.customerID = order_header.customerID
          where: customer_detail.companyName = "Romero y tomillo"
 } -> {
+     # format currency
      aggregate: avg_sales_per_order is round(order_sales.avg(),2)
 } // I'm still thinking in rectangles I think...
 
@@ -184,7 +186,7 @@ run: OrdersBase -> {
        where: customer_detail.companyName = 'North/South'
 }
 
-// Version 2, just hard coded the date they said to use... looks off still
+// Version 2, just hard coded the date they said to use... still doesn't match
 run: OrdersBase -> {
    join_one: customer_detail is Customers on customer_detail.customerID = customerID
   aggregate: days_since_order is min(days(@2022-10-04 to now))
@@ -203,7 +205,7 @@ run: OrdersBase -> {
      group_by: customerID
     aggregate: order_count is count()
 } -> {
-    aggregate: customers_with_1_order is count()
+    aggregate: customers_with_only_1_order is count()
         where: order_count = 1
 }
 >>>markdown
@@ -256,7 +258,7 @@ query: my_solution is CustomersBase -> {
     join_one: product_details is ProductsBase on product_details.productID = order_details.productID
    aggregate: purchases_of_queso_cabrales is count() { where: product_details.productName = 'Queso Cabrales'}
  } -> {
-   aggregate: customers_with_zero_purchases is count()
+   aggregate: customers_with_zero_queso_purchases is count()
        where: purchases_of_queso_cabrales = 0
  }
 
@@ -285,7 +287,7 @@ run: Customers -> {
    group_by: customerID
   aggregate: purchases_of_queso_cabrales is count() { where: Orders.OrderDetails.Products.productName = 'Queso Cabrales'}
 } -> {
-   aggregate: customers_with_zero_purchases is count()
+   aggregate: customers_with_zero_queso_purchases is count()
        where: purchases_of_queso_cabrales = 0
 }
 
@@ -306,7 +308,7 @@ query: question_15 is CustomersBase -> {
        where: order_quantity_of_queso > 0 and order_quantity_of_other_products = 0
  }
 
-// Again doesn't work with the way the predefined model is setup
+// Again doesn't work with the way the predefined model is setup, unsure why at the moment
 run: Customers -> {
     group_by: customerID, Orders.orderID
    aggregate: order_quantity_of_queso is count() { where: Orders.OrderDetails.Products.productName = 'Queso Cabrales'}
@@ -324,7 +326,6 @@ run: ProductsBase -> {
    aggregate: count_out_of_stock is count()
        where: unitsInStock <= 0
 }
-
 >>>markdown
 Question 17: How many products need to be restocked (based on restock levels)?
 >>>malloy
@@ -348,6 +349,7 @@ run: ProductsBase -> {
 Question 19: What is the stocked value of the discontinued products?
 >>>malloy
 run: ProductsBase -> {
+    # format currency
     aggregate: value_of_discontinued_products_in_stock is sum(unitPrice * unitsInStock)
         where: is_discontinued
 }
@@ -358,6 +360,7 @@ Question 20: Which vendor has the highest stock value?
 // Assuming maybe which product has the highest current value based on current stocked quantity?
 run: ProductsBase -> {
      group_by: productID, productName
+     # format currency
     aggregate: stock_value is sum(unitPrice * unitsInStock)
      order_by: stock_value desc
         limit: 1
@@ -368,6 +371,7 @@ run: ProductsBase -> {
 run: ProductsBase -> {
     group_by: supplierID, supplier.companyName
     join_one: supplier is SuppliersBase on supplier.supplierID = supplierID
+    # format currency
    aggregate: stock_value is sum(unitPrice * unitsInStock)
     order_by: stock_value desc
        limit: 1
@@ -375,23 +379,55 @@ run: ProductsBase -> {
 >>>markdown
 Question 21: How many employees (%) are female? (we don't seem to have a gender, see if you can solve with baby names.)
 >>>malloy
-// Assuming gender by pronoun "preferences" in notes, had to not exclude it in the transformation
+// Assuming gender by pronoun "preferences" in notes, had to not exclude it in the transformation and upload an updated parquet
 run: EmployeesBase -> {
-    project: has_female_pronouns is notes ~ 'Her%'
+    project: has_female_pronouns is notes ~ r'[Ss]he'
+} -> {
+    aggregate: 
+        female_count is count() { where: has_female_pronouns }
+        total_count is count()
+} -> {
+    # format percent
+    project: percent_female is female_count / total_count
 }
+
+run: Em
 >>>markdown
 Question 22: How many employees are 60 years old or over?
-
-Cannot solve this one as i am missing 'age' column in my source.
+>>>malloy
+run: EmployeesBase -> {
+    aggregate: over_60_count is count()
+        where: birthDate < (now - 60 years)
+}
 >>>markdown
 Question 23: Which employee had the highest sales in 1997? - (slightly modified, originally it was 2022 but my version of data has different time range)
 >>>malloy
-// Your answer
+run: OrderDetailsBase -> {
+    join_one: order_header is OrdersBase on order_header.orderID = orderID
+    join_one: employees is EmployeesBase on employees.employeeID = order_header.employeeID
+    group_by: order_header.employeeID, Employee is concat(employees.firstName, ' ', employees.lastName)
+    # format currency
+   aggregate: order_value_1997 is sum(unitPrice * quantity) { where: order_header.orderDate.year = @1997}
+    order_by: order_value_1997 desc
+       limit: 1
+}
 >>>markdown
 Question 24: How many employees sold over 100K$ in 1997? (slightly modified, originally it was 2022 but my version of data has different time range)
 >>>malloy
-// Your answer
+run: OrderDetailsBase -> {
+    join_one: order_header is OrdersBase on order_header.orderID = orderID
+    join_one: employees is EmployeesBase on employees.employeeID = order_header.employeeID
+    group_by: order_header.employeeID, Employee is concat(employees.firstName, ' ', employees.lastName)
+    # format currency
+   aggregate: order_value_1997 is sum(unitPrice * quantity) { where: order_header.orderDate.year = @1997}
+} -> {
+    aggregate: employees_over_100k is count()
+        where: order_value_1997 > 100000
+}
 >>>markdown
 Question 25: How many employees got hired in 1994?
 >>>malloy
-// Your answer
+run: EmployeesBase -> {
+    aggregate: hired_in_1994 is count()
+        where: hireDate.year = @1994
+}
