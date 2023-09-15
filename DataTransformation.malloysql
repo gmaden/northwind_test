@@ -40,7 +40,7 @@ source: csv_employees is duckdb.sql("""
                         nullstr = 'NULL')
 """) 
   extend {
-          except: notes, photoPath, photo, homePhone
+          except: photoPath, photo, homePhone
   }
 
 source: csv_orders_det is duckdb.table('../northwind_test/raw_csv/order_details.csv')
@@ -82,14 +82,12 @@ copy %{
     project: *  
     }
 }%  to 'C:\Malloy\Northwind\northwind_test\parquet\categories.parquet' (FORMAT 'parquet', CODEC 'ZSTD')
-
 >>>sql
 copy %{
   csv_customers -> {
     project: *  
     }
 }%  to 'C:\Malloy\Northwind\northwind_test\parquet\customers.parquet' (FORMAT 'parquet', CODEC 'ZSTD')
-
 >>>sql
 copy %{
   csv_employee_terr -> {
@@ -102,29 +100,25 @@ copy %{
   csv_employees -> {
     project: *  
     }
-}%  to 'C:\Malloy\Northwind\northwind_test\parquet\employees.parquet' (FORMAT 'parquet', CODEC 'ZSTD')
-
+}%  to 'parquet/employees.parquet' (FORMAT 'parquet', CODEC 'ZSTD')
 >>>sql
 copy %{
   csv_orders_det -> {
     project: *  
     }
 }%  to 'C:\Malloy\Northwind\northwind_test\parquet\order_details.parquet' (FORMAT 'parquet', CODEC 'ZSTD')
-
 >>>sql
 copy %{
   csv_orders -> {
     project: *  
     }
 }%  to 'C:\Malloy\Northwind\northwind_test\parquet\orders.parquet' (FORMAT 'parquet', CODEC 'ZSTD')
-
 >>>sql
 copy %{
   csv_products -> {
     project: *  
     }
 }%  to 'C:\Malloy\Northwind\northwind_test\parquet\products.parquet' (FORMAT 'parquet', CODEC 'ZSTD')
-
 >>>sql
 copy %{
   csv_regions -> {

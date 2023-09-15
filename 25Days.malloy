@@ -8,6 +8,9 @@ source: SuppliersBase is duckdb.table('../northwind_test/parquet/suppliers.parqu
 
 source: ProductsBase is duckdb.table('../northwind_test/parquet/products.parquet') extend {
   primary_key: supplierID
+  dimension:
+    is_discontinued is discontinued = 1
+    is_current is discontinued = 0
   measure: 
     product_count is count()
     total_price is unitPrice.sum()
