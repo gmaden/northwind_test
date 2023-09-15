@@ -136,7 +136,7 @@ INNER JOIN '../northwind_test/parquet/orders.parquet' AS orders ON details.order
      WHERE orders.shippedDate IS NULL
 """)
 
-// Version 2, 
+// Version 3, just noticed the revenue column 
 run: OrdersBase -> {
     join_many: details is OrderDetailsBase on orderID = details.orderID
     # format currency
@@ -178,7 +178,7 @@ run: OrderDetailsBase -> {
 >>>markdown
 Question 10: How many days since 'North/South' last purchase?
 >>>malloy
-// Are we missing data? last order date should be 10/4/2022
+// Are we missing data? says last order date should be 10/4/2022
 // Version 1
 run: OrdersBase -> {
     join_one: customer_detail is Customers on customer_detail.customerID = customerID
@@ -238,6 +238,7 @@ query: orders_in_1998 is OrdersBase -> {
 //       where: customerID not in orders_in_1998
 // }
 
+// Learned how to filter my aggregates in line...
 run: OrdersBase -> {
      group_by: customerID
     aggregate: 
